@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>MyCarGarage</title>
+<meta name="description" content="Gestione manutenzione, spese e scadenze dei tuoi veicoli">
+<meta name="theme-color" content="#14161B">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#14161B; --panel:#1D2129; --panel2:#262B36; --line:#313846;
+  --text:#EAECEF; --muted:#98A0AC;
+  --amber:#FFB020; --green:#3DD68C; --yellow:#FFC53D; --red:#F2555A;
+  --plate-yellow:#FFD34E; --radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Barlow',system-ui,sans-serif; font-size:16px;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+h1,h2,h3,.disp{font-family:'Barlow Condensed',sans-serif;letter-spacing:.02em}
+button{font-family:inherit;border:none;cursor:pointer;background:none;color:inherit}
+input,select,textarea{
+  font-family:inherit;font-size:16px;color:var(--text);
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:12px;width:100%;outline:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--amber)}
+label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+.hidden{display:none!important}
+
+/* ---------- HEADER ---------- */
+header{
+  position:sticky;top:0;z-index:50;background:rgba(20,22,27,.92);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+  display:flex;align-items:center;gap:10px;
+}
+header .logo{width:34px;height:34px;border-radius:9px}
+header h1{font-size:24px;font-weight:700;flex:1}
+header h1 span{color:var(--amber)}
+.hbtn{width:38px;height:38px;border-radius:10px;background:var(--panel);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:18px}
+#syncDot{width:9px;height:9px;border-radius:50%;background:var(--muted);margin-right:2px;transition:background .3s}
+#syncDot.ok{background:var(--green)} #syncDot.err{background:var(--red)} #syncDot.busy{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+
+main{max-width:640px;margin:0 auto;padding:16px 16px 110px}
+
+/* ---------- LOCK ---------- */
+#viewLock{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:22px;padding:24px}
+#viewLock img{width:84px;height:84px;border-radius:20px}
+#viewLock h2{font-size:30px}
+.pinDots{display:flex;gap:14px}
+.pinDots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted);transition:.15s}
+.pinDots i.on{background:var(--amber);border-color:var(--amber)}
+.pinDots.shake{animation:shake .35s}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.keypad{display:grid;grid-template-columns:repeat(3,72px);gap:14px}
+.keypad button{width:72px;height:72px;border-radius:50%;background:var(--panel);border:1px solid var(--line);
+  font-size:26px;font-family:'Barlow Condensed';font-weight:600}
+.keypad button:active{background:var(--panel2)}
+
+/* ---------- SCADENZE STRIP ---------- */
+.secTitle{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);
+  margin:22px 0 10px;display:flex;align-items:center;gap:8px}
+.secTitle::after{content:'';flex:1;height:1px;background:var(--line)}
+.duebox{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.dueRow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--line)}
+.dueRow:last-child{border-bottom:none}
+.dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.dot.g{background:var(--green)} .dot.y{background:var(--yellow)}
+.dot.r{background:var(--red)} .dot.over{background:var(--red);animation:pulse 1s infinite}
+.dueRow .info{flex:1;min-width:0}
+.dueRow .info b{font-size:16px}
+.dueRow .info small{display:block;color:var(--muted);font-size:13px}
+.days{font-family:'Barlow Condensed';font-weight:700;font-size:22px;text-align:right;line-height:1}
+.days small{display:block;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.days.g{color:var(--green)} .days.y{color:var(--yellow)} .days.r{color:var(--red)}
+.emptyMsg{padding:22px;text-align:center;color:var(--muted);font-size:14px}
+
+/* ---------- VEHICLE CARDS ---------- */
+.vcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px;margin-bottom:14px;position:relative;overflow:hidden;cursor:pointer}
+.vcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--vc,var(--amber))}
+.vcard .top{display:flex;align-items:flex-start;gap:12px}
+.vcard h3{font-size:24px;font-weight:700;line-height:1.1}
+.vcard .sub{color:var(--muted);font-size:14px;margin-top:2px}
+.plate{
+  margin-left:auto;flex-shrink:0;background:var(--plate-yellow);color:#111;
+  font-family:'Barlow Condensed';font-weight:700;font-size:17px;letter-spacing:.05em;
+  padding:4px 10px;border-radius:5px;border:1.5px solid #111;
+}
+.vcard .stats{display:flex;gap:18px;margin-top:12px;font-size:14px;color:var(--muted)}
+.vcard .stats b{color:var(--text);font-family:'Barlow Condensed';font-size:18px;font-weight:600}
+.vcard .mini{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.miniDue{display:flex;align-items:center;gap:8px;font-size:14px}
+.miniDue .dot{width:9px;height:9px}
+.miniDue span{color:var(--muted)}
+.miniDue b{margin-left:auto;font-family:'Barlow Condensed';font-size:16px}
+
+/* ---------- FAB ---------- */
+#fab{position:fixed;right:20px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:60;
+  width:60px;height:60px;border-radius:50%;background:var(--amber);color:#111;
+  font-size:30px;font-weight:600;box-shadow:0 6px 20px rgba(255,176,32,.35);
+  display:flex;align-items:center;justify-content:center;transition:transform .2s}
+#fab.open{transform:rotate(45deg)}
+#fabMenu{position:fixed;right:20px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:60;
+  display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+#fabMenu button{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:12px 16px;font-size:15px;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+
+/* ---------- VEHICLE DETAIL ---------- */
+.backbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.backbar button{font-size:15px;color:var(--amber);display:flex;align-items:center;gap:6px}
+.vhead{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden}
+.vhead::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--vc,var(--amber))}
+.vhead h2{font-size:30px;line-height:1.05}
+.vhead .sub{color:var(--muted);margin-top:3px}
+.vhead .row2{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+.kmBadge{font-family:'Barlow Condensed';font-size:20px;font-weight:600;background:var(--panel2);
+  border:1px solid var(--line);border-radius:8px;padding:5px 12px;display:flex;align-items:center;gap:8px}
+.kmBadge button{color:var(--amber);font-size:14px}
+.totRow{display:flex;gap:12px;margin-top:14px}
+.totBox{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.totBox small{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.totBox b{font-family:'Barlow Condensed';font-size:26px;font-weight:700;color:var(--amber)}
+.tabs{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px;margin:18px 0 12px}
+.tabs button{flex:1;padding:10px;border-radius:9px;font-size:15px;font-weight:600;color:var(--muted)}
+.tabs button.on{background:var(--panel2);color:var(--text)}
+.item{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.item .r1{display:flex;align-items:center;gap:10px}
+.item .r1 b{font-size:17px;flex:1}
+.item .r1 .price{font-family:'Barlow Condensed';font-size:20px;font-weight:700;color:var(--amber)}
+.item .r2{display:flex;gap:14px;color:var(--muted);font-size:13px;margin-top:5px;flex-wrap:wrap}
+.item .desc{margin-top:6px;font-size:14px}
+.item .acts{display:flex;gap:10px;margin-top:10px}
+.item .acts button{font-size:13px;color:var(--muted);padding:6px 10px;border:1px solid var(--line);border-radius:8px}
+.item .acts button.amber{color:var(--amber);border-color:var(--amber)}
+.item .acts button.red{color:var(--red)}
+.badgeStato{font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--panel2);color:var(--muted)}
+
+/* ---------- MODALS ---------- */
+.overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:20px 20px 0 0;
+  width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:20px 20px calc(24px + env(safe-area-inset-bottom))}
+.sheet h2{font-size:24px;margin-bottom:4px}
+.sheet .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.btnRow{display:flex;gap:12px;margin-top:22px}
+.btn{flex:1;padding:14px;border-radius:12px;font-size:16px;font-weight:600;text-align:center}
+.btn.primary{background:var(--amber);color:#111}
+.btn.ghost{background:var(--panel2);border:1px solid var(--line)}
+.btn.danger{background:transparent;border:1px solid var(--red);color:var(--red)}
+.colorPick{display:flex;gap:10px;flex-wrap:wrap}
+.colorPick i{width:34px;height:34px;border-radius:50%;cursor:pointer;border:3px solid transparent}
+.colorPick i.on{border-color:#fff}
+.warnBanner{background:rgba(255,176,32,.12);border:1px solid var(--amber);border-radius:12px;
+  padding:12px 14px;font-size:14px;margin-bottom:16px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(100px + env(safe-area-inset-bottom));
+  background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 20px;
+  font-size:15px;z-index:150;box-shadow:0 6px 20px rgba(0,0,0,.5);opacity:0;transition:opacity .25s;pointer-events:none}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN -->
+<div id="viewLock">
+  <img src="icons/icon-192.png" alt="">
+  <h2>MyCar<span style="color:var(--amber)">Garage</span></h2>
+  <div class="pinDots" id="pinDots"><i></i><i></i><i></i><i></i></div>
+  <div class="keypad" id="keypad"></div>
+</div>
+
+<header>
+  <img class="logo" src="icons/icon-192.png" alt="">
+  <h1>MyCar<span>Garage</span></h1>
+  <div id="syncDot" title="Stato sincronizzazione"></div>
+  <button class="hbtn" onclick="loadData(true)" title="Aggiorna">⟳</button>
+  <button class="hbtn" onclick="openSettings()" title="Impostazioni">⚙</button>
+</header>
+
+<main>
+  <!-- DASHBOARD -->
+  <div id="viewDash">
+    <div id="cfgWarn" class="warnBanner hidden">
+      ⚠️ Backend non configurato. Apri ⚙ Impostazioni e incolla l'URL dello script.
+    </div>
+    <div class="secTitle">Prossime scadenze</div>
+    <div class="duebox" id="dueList"></div>
+    <div class="secTitle">Il mio garage</div>
+    <div id="vlist"></div>
+  </div>
+
+  <!-- VEHICLE DETAIL -->
+  <div id="viewVehicle" class="hidden"></div>
+</main>
+
+<div id="fabMenu" class="hidden">
+  <button onclick="openInterventoForm()">🔧 Nuovo intervento</button>
+  <button onclick="openScadenzaForm()">📅 Nuova scadenza</button>
+  <button onclick="openVehicleForm()">🚗 Nuovo veicolo</button>
+</div>
+<button id="fab" onclick="toggleFab()">+</button>
+
+<div id="modalHost"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   MyCarGarage v1.0.0
+   >>> INCOLLA QUI SOTTO L'URL DELLO SCRIPT (che finisce con /exec)
+   ============================================================ */
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2aplWOhRHY3omvKpqZUKtRfVPIKFoiMq8OMTVY3XGju5sqeoo4lX_8WG63KunPHI-_w/exec';
+
+const APP_VERSION = '1.0.1';
+const PIN = '5918';
+const COLORS = ['#FFB020','#3D8BFF','#F2555A','#3DD68C','#B47CFF','#FF7A45','#4DD0E1','#9AA0AC'];
+const TIPI_INTERVENTO = ['Cambio olio','Filtri','Freni','Gomme','Batteria','Cinghia/Distribuzione','Pezzo sostituito','Riparazione','Carrozzeria','Lavaggio/Detailing','Altro'];
+const TIPI_SCADENZA = ['Assicurazione','Road Tax','MOT','Service/Tagliando','Altro'];
+
+let DB = {veicoli:[], interventi:[], scadenze:[]};
+let currentVehicle = null;
+let currentTab = 'interventi';
+
+/* ---------------- UTILS ---------------- */
+const $ = id => document.getElementById(id);
+function getUrl(){ const s = localStorage.getItem('mcg_url'); return (s && s.startsWith('http')) ? s : (SCRIPT_URL.startsWith('http') ? SCRIPT_URL : null); }
+function fmtMoney(n){ n = Number(n)||0; return '£' + n.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDateIt(s){ if(!s) return '—'; const p = String(s).split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : s; }
+function fmtKm(n){ n = Number(n)||0; return n.toLocaleString('en-GB'); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function daysTo(s){ if(!s) return null; const d=new Date(s+'T00:00:00'); const t=new Date(); t.setHours(0,0,0,0); return Math.round((d-t)/86400000); }
+function sevClass(days){ if(days===null) return 'g'; if(days<0) return 'over'; if(days<=14) return 'r'; if(days<=45) return 'y'; return 'g'; }
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2400); }
+function vName(v){ return v.Nome || (v.Marca+' '+v.Modello).trim() || 'Veicolo'; }
+function vById(id){ return DB.veicoli.find(v=>String(v.ID)===String(id)); }
+function plusOneYear(s){ const d=new Date(s+'T00:00:00'); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
+
+/* ---------------- PIN ---------------- */
+let pinBuf = '';
+function buildKeypad(){
+  const kp = $('keypad');
+  ['1','2','3','4','5','6','7','8','9','','0','⌫'].forEach(k=>{
+    const b = document.createElement('button');
+    b.textContent = k;
+    if(k==='') b.style.visibility='hidden';
+    b.onclick = ()=>pinKey(k);
+    kp.appendChild(b);
+  });
+}
+function pinKey(k){
+  if(k==='⌫'){ pinBuf = pinBuf.slice(0,-1); }
+  else if(pinBuf.length<4){ pinBuf += k; }
+  const dots = $('pinDots').children;
+  for(let i=0;i<4;i++) dots[i].classList.toggle('on', i<pinBuf.length);
+  if(pinBuf.length===4){
+    if(pinBuf===PIN){
+      sessionStorage.setItem('mcg_auth','1');
+      $('viewLock').classList.add('hidden');
+    } else {
+      $('pinDots').classList.add('shake');
+      setTimeout(()=>{ $('pinDots').classList.remove('shake'); pinBuf=''; for(const d of dots) d.classList.remove('on'); },380);
+    }
+  }
+}
+
+/* ---------------- API ---------------- */
+async function api(action, payload={}){
+  const url = getUrl();
+  if(!url) throw new Error('URL script non configurato');
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(Object.assign({action}, payload))
+  });
+  const j = await res.json();
+  if(!j.ok) throw new Error(j.error||'Errore sconosciuto');
+  return j.data;
+}
+
+async function loadData(manual){
+  // cache immediata
+  const cached = localStorage.getItem('mcg_cache');
+  if(cached && !manual){ try{ DB = JSON.parse(cached); render(); }catch(e){} }
+  if(!getUrl()){ $('cfgWarn').classList.remove('hidden'); return; }
+  $('cfgWarn').classList.add('hidden');
+  setSync('busy');
+  try{
+    DB = await api('getAll');
+    localStorage.setItem('mcg_cache', JSON.stringify(DB));
+    setSync('ok');
+    render();
+    if(manual) toast('Dati aggiornati ✓');
+  }catch(e){
+    setSync('err');
+    if(manual) toast('Errore: ' + e.message);
+  }
+}
+function setSync(cls){ $('syncDot').classList.remove('ok','err','busy'); if(cls) $('syncDot').classList.add(cls); }
+
+async function doAction(action, payload, okMsg){
+  setSync('busy');
+  try{
+    await api(action, payload);
+    await loadData(false);
+    // force refresh from server already done in loadData; re-render current view
+    if(currentVehicle && !vById(currentVehicle)) { currentVehicle=null; showDash(); }
+    else render();
+    setSync('ok');
+    if(okMsg) toast(okMsg);
+    return true;
+  }catch(e){
+    setSync('err');
+    toast('Errore: ' + e.message);
+    return false;
+  }
+}
+
+/* ---------------- RENDER ---------------- */
+function render(){
+  if(currentVehicle) renderVehicle(currentVehicle);
+  renderDash();
+}
+
+function activeVehicles(){ return DB.veicoli.filter(v=>v.Stato!=='archiviata'); }
+function activeScadenze(){ return DB.scadenze.filter(s=>s.Stato==='attiva'); }
+
+function renderDash(){
+  // Prossime scadenze (tutti i veicoli attivi)
+  const activeIds = new Set(activeVehicles().map(v=>String(v.ID)));
+  const due = activeScadenze()
+    .filter(s=>activeIds.has(String(s.VeicoloID)))
+    .map(s=>({s, days:daysTo(s.DataScadenza)}))
+    .sort((a,b)=>(a.days??9999)-(b.days??9999));
+
+  const box = $('dueList');
+  if(due.length===0){
+    box.innerHTML = '<div class="emptyMsg">Nessuna scadenza registrata.<br>Aggiungi assicurazione, road tax, MOT o service con il tasto +</div>';
+  } else {
+    box.innerHTML = due.slice(0,8).map(({s,days})=>{
+      const v = vById(s.VeicoloID);
+      const sev = sevClass(days);
+      const dTxt = days===null?'—':(days<0? Math.abs(days) : days);
+      const dLbl = days===null?'':(days<0?'giorni fa':(days===0?'OGGI':'giorni'));
+      return `<div class="dueRow" onclick="showVehicle('${s.VeicoloID}','scadenze')">
+        <div class="dot ${sev}"></div>
+        <div class="info"><b>${esc(s.Tipo)}</b><small>${esc(v?vName(v):'?')} · scade ${fmtDateIt(s.DataScadenza)}</small></div>
+        <div class="days ${sev==='over'?'r':sev}">${days===0?'⚠':dTxt}<small>${dLbl}</small></div>
+      </div>`;
+    }).join('');
+  }
+
+  // Cards veicoli
+  const year = new Date().getFullYear();
+  const list = $('vlist');
+  const vs = activeVehicles();
+  if(vs.length===0){
+    list.innerHTML = '<div class="duebox"><div class="emptyMsg">Il garage è vuoto.<br>Aggiungi il primo veicolo con il tasto +</div></div>';
+    return;
+  }
+  list.innerHTML = vs.map(v=>{
+    const spentYear = spesaAnno(v.ID, year);
+    const vDue = activeScadenze().filter(s=>String(s.VeicoloID)===String(v.ID))
+      .map(s=>({s,days:daysTo(s.DataScadenza)})).sort((a,b)=>(a.days??9999)-(b.days??9999)).slice(0,3);
+    const mini = vDue.map(({s,days})=>{
+      const sev = sevClass(days);
+      return `<div class="miniDue"><div class="dot ${sev}"></div><span>${esc(s.Tipo)}</span><b class="${sev==='over'?'r':''}" style="color:var(--${sev==='over'||sev==='r'?'red':sev==='y'?'yellow':'green'})">${days===null?'—':days<0?'scaduta':days+' gg'}</b></div>`;
+    }).join('');
+    return `<div class="vcard" style="--vc:${esc(v.Colore||'#FFB020')}" onclick="showVehicle('${v.ID}')">
+      <div class="top">
+        <div><h3>${esc(vName(v))}</h3><div class="sub">${esc((v.Marca+' '+v.Modello).trim())} ${esc(v.Anno||'')}</div></div>
+        ${v.Targa?`<div class="plate">${esc(v.Targa)}</div>`:''}
+      </div>
+      <div class="stats">
+        <div><b>${fmtKm(v.Km)}</b> km</div>
+        <div><b>${fmtMoney(spentYear)}</b> spesi nel ${year}</div>
+      </div>
+      ${mini?`<div class="mini">${mini}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function spesaAnno(vid, year){
+  let tot = 0;
+  DB.interventi.forEach(i=>{ if(String(i.VeicoloID)===String(vid) && String(i.Data).startsWith(year)) tot += Number(i.Prezzo)||0; });
+  DB.scadenze.forEach(s=>{ if(String(s.VeicoloID)===String(vid) && String(s.DataInizio).startsWith(year)) tot += Number(s.Prezzo)||0; });
+  return tot;
+}
+function spesaTotale(vid){
+  let tot = 0;
+  DB.interventi.forEach(i=>{ if(String(i.VeicoloID)===String(vid)) tot += Number(i.Prezzo)||0; });
+  DB.scadenze.forEach(s=>{ if(String(s.VeicoloID)===String(vid)) tot += Number(s.Prezzo)||0; });
+  return tot;
+}
+
+/* ---------------- VEHICLE DETAIL ---------------- */
+function showDash(){
+  currentVehicle = null;
+  $('viewVehicle').classList.add('hidden');
+  $('viewDash').classList.remove('hidden');
+  renderDash();
+  window.scrollTo(0,0);
+}
+function showVehicle(id, tab){
+  event && event.stopPropagation && event.stopPropagation();
+  currentVehicle = id;
+  if(tab) currentTab = tab;
+  $('viewDash').classList.add('hidden');
+  $('viewVehicle').classList.remove('hidden');
+  renderVehicle(id);
+  window.scrollTo(0,0);
+}
+function setTab(t){ currentTab = t; renderVehicle(currentVehicle); }
+
+function renderVehicle(id){
+  const v = vById(id);
+  if(!v){ showDash(); return; }
+  const year = new Date().getFullYear();
+  const ints = DB.interventi.filter(i=>String(i.VeicoloID)===String(id))
+    .sort((a,b)=>String(b.Data).localeCompare(String(a.Data)));
+  const scads = DB.scadenze.filter(s=>String(s.VeicoloID)===String(id))
+    .sort((a,b)=>{
+      if((a.Stato==='attiva')!==(b.Stato==='attiva')) return a.Stato==='attiva'?-1:1;
+      return String(b.DataScadenza).localeCompare(String(a.DataScadenza));
+    });
+
+  let body = '';
+  if(currentTab==='interventi'){
+    body = ints.length===0
+      ? '<div class="duebox"><div class="emptyMsg">Nessun intervento registrato</div></div>'
+      : ints.map(i=>`<div class="item">
+          <div class="r1"><b>${esc(i.Descrizione||i.Tipo)}</b><span class="price">${fmtMoney(i.Prezzo)}</span></div>
+          <div class="r2"><span>📅 ${fmtDateIt(i.Data)}</span>${i.Km?`<span>🛣 ${fmtKm(i.Km)} km</span>`:''}</div>
+          ${i.Descrizione&&i.Tipo?`<div class="desc">${esc(i.Tipo)}</div>`:''}
+          ${i.Note?`<div class="desc" style="color:var(--muted)">${esc(i.Note)}</div>`:''}
+          <div class="acts"><button class="red" onclick="delIntervento('${i.ID}')">Elimina</button></div>
+        </div>`).join('');
+  } else {
+    body = scads.length===0
+      ? '<div class="duebox"><div class="emptyMsg">Nessuna scadenza registrata</div></div>'
+      : scads.map(s=>{
+          const days = daysTo(s.DataScadenza);
+          const sev = sevClass(days);
+          const attiva = s.Stato==='attiva';
+          return `<div class="item" style="${attiva?'':'opacity:.55'}">
+            <div class="r1">
+              ${attiva?`<div class="dot ${sev}"></div>`:''}
+              <b>${esc(s.Tipo)}</b>
+              ${attiva?'':`<span class="badgeStato">${esc(s.Stato)}</span>`}
+              <span class="price">${fmtMoney(s.Prezzo)}</span>
+            </div>
+            <div class="r2">
+              <span>Dal ${fmtDateIt(s.DataInizio)}</span>
+              <span>al ${fmtDateIt(s.DataScadenza)}</span>
+              ${attiva&&days!==null?`<span style="color:var(--${sev==='over'||sev==='r'?'red':sev==='y'?'yellow':'green'});font-weight:600">${days<0?'SCADUTA da '+Math.abs(days)+' gg':days===0?'SCADE OGGI':days+' giorni mancanti'}</span>`:''}
+            </div>
+            ${s.Note?`<div class="desc" style="color:var(--muted)">${esc(s.Note)}</div>`:''}
+            <div class="acts">
+              ${attiva?`<button class="amber" onclick="openRenewForm('${s.ID}')">↻ Rinnova</button>`:''}
+              <button class="red" onclick="delScadenza('${s.ID}')">Elimina</button>
+            </div>
+          </div>`;
+        }).join('');
+  }
+
+  $('viewVehicle').innerHTML = `
+    <div class="backbar">
+      <button onclick="showDash()">← Garage</button>
+      <div style="flex:1"></div>
+      <button onclick="openVehicleForm('${v.ID}')" style="color:var(--muted)">✎ Modifica</button>
+    </div>
+    <div class="vhead" style="--vc:${esc(v.Colore||'#FFB020')}">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="flex:1"><h2>${esc(vName(v))}</h2><div class="sub">${esc((v.Marca+' '+v.Modello).trim())} ${esc(v.Anno||'')}</div></div>
+        ${v.Targa?`<div class="plate">${esc(v.Targa)}</div>`:''}
+      </div>
+      <div class="row2">
+        <div class="kmBadge">${fmtKm(v.Km)} km <button onclick="editKm('${v.ID}')">✎</button></div>
+      </div>
+      ${v.Note?`<div class="desc" style="margin-top:10px;color:var(--muted);font-size:14px">${esc(v.Note)}</div>`:''}
+    </div>
+    <div class="totRow">
+      <div class="totBox"><small>Spese ${year}</small><b>${fmtMoney(spesaAnno(v.ID, year))}</b></div>
+      <div class="totBox"><small>Spese totali</small><b>${fmtMoney(spesaTotale(v.ID))}</b></div>
+    </div>
+    <div class="tabs">
+      <button class="${currentTab==='interventi'?'on':''}" onclick="setTab('interventi')">🔧 Interventi (${ints.length})</button>
+      <button class="${currentTab==='scadenze'?'on':''}" onclick="setTab('scadenze')">📅 Scadenze (${scads.length})</button>
+    </div>
+    ${body}`;
+}
+
+async function editKm(id){
+  const v = vById(id);
+  const nv = prompt('Km attuali di ' + vName(v) + ':', v.Km||0);
+  if(nv===null) return;
+  const km = parseInt(nv.replace(/\D/g,''),10);
+  if(isNaN(km)) return toast('Valore non valido');
+  await doAction('updateVehicle', {id:id, km:km}, 'Km aggiornati ✓');
+}
+
+/* ---------------- FAB ---------------- */
+function toggleFab(){
+  const open = $('fabMenu').classList.toggle('hidden');
+  $('fab').classList.toggle('open', !open);
+}
+function closeFab(){ $('fabMenu').classList.add('hidden'); $('fab').classList.remove('open'); }
+
+/* ---------------- MODALS ---------------- */
+function modal(html){
+  $('modalHost').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`;
+}
+function closeModal(){ $('modalHost').innerHTML=''; }
+
+function vehicleOptions(sel){
+  return activeVehicles().map(v=>`<option value="${v.ID}" ${String(sel)===String(v.ID)?'selected':''}>${esc(vName(v))}</option>`).join('');
+}
+function typeOptions(arr, sel){
+  return arr.map(t=>`<option ${t===sel?'selected':''}>${t}</option>`).join('');
+}
+
+/* --- Veicolo --- */
+function openVehicleForm(id){
+  closeFab();
+  const v = id ? vById(id) : null;
+  const colore = v ? (v.Colore||COLORS[0]) : COLORS[0];
+  modal(`
+    <h2>${v?'Modifica veicolo':'Nuovo veicolo'}</h2>
+    <label>Nome (come lo chiami tu)</label>
+    <input id="f_nome" value="${esc(v?.Nome||'')}" placeholder="es. Qubo">
+    <div class="grid2">
+      <div><label>Marca</label><input id="f_marca" value="${esc(v?.Marca||'')}" placeholder="Fiat"></div>
+      <div><label>Modello</label><input id="f_modello" value="${esc(v?.Modello||'')}" placeholder="Qubo"></div>
+      <div><label>Anno</label><input id="f_anno" type="number" value="${esc(v?.Anno||'')}" placeholder="2017"></div>
+      <div><label>Targa</label><input id="f_targa" value="${esc(v?.Targa||'')}" placeholder="AB17 CDE" style="text-transform:uppercase"></div>
+    </div>
+    <label>Km attuali</label>
+    <input id="f_km" type="number" value="${esc(v?.Km||'')}" placeholder="85000">
+    <label>Colore etichetta</label>
+    <div class="colorPick" id="colorPick">${COLORS.map(c=>`<i style="background:${c}" class="${c===colore?'on':''}" onclick="pickColor(this)" data-c="${c}"></i>`).join('')}</div>
+    <label>Note</label>
+    <textarea id="f_note" rows="2" placeholder="opzionale">${esc(v?.Note||'')}</textarea>
+    <div class="btnRow">
+      <button class="btn ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn primary" onclick="saveVehicle('${id||''}')">${v?'Salva':'Aggiungi'}</button>
+    </div>
+    ${v?`<div class="btnRow">
+      <button class="btn ghost" onclick="archiveVehicle('${id}')">📦 Archivia</button>
+      <button class="btn danger" onclick="removeVehicle('${id}')">Elimina tutto</button>
+    </div>`:''}
+  `);
+}
+function pickColor(el){ document.querySelectorAll('#colorPick i').forEach(i=>i.classList.remove('on')); el.classList.add('on'); }
+async function saveVehicle(id){
+  const p = {
+    nome: $('f_nome').value.trim(),
+    marca: $('f_marca').value.trim(),
+    modello: $('f_modello').value.trim(),
+    anno: $('f_anno').value.trim(),
+    targa: $('f_targa').value.trim().toUpperCase(),
+    km: parseInt($('f_km').value,10)||0,
+    colore: document.querySelector('#colorPick i.on')?.dataset.c || COLORS[0],
+    note: $('f_note').value.trim()
+  };
+  if(!p.nome && !p.marca) return toast('Inserisci almeno il nome o la marca');
+  closeModal();
+  if(id) await doAction('updateVehicle', Object.assign({id}, p), 'Veicolo aggiornato ✓');
+  else await doAction('addVehicle', p, 'Veicolo aggiunto ✓');
+}
+async function archiveVehicle(id){
+  if(!confirm('Archiviare questo veicolo?\nSparirà dalla dashboard ma lo storico resta salvato.')) return;
+  closeModal();
+  const ok = await doAction('setVehicleState', {id, stato:'archiviata'}, 'Veicolo archiviato');
+  if(ok) showDash();
+}
+async function removeVehicle(id){
+  if(!confirm('⚠️ ATTENZIONE: eliminare il veicolo E TUTTO il suo storico (interventi + scadenze)?\nQuesta azione non si può annullare.')) return;
+  if(!confirm('Sei davvero sicuro? Tutto lo storico andrà perso.')) return;
+  closeModal();
+  const ok = await doAction('deleteVehicle', {id}, 'Veicolo eliminato');
+  if(ok) showDash();
+}
+
+/* --- Intervento --- */
+function openInterventoForm(){
+  closeFab();
+  if(activeVehicles().length===0) return toast('Prima aggiungi un veicolo');
+  const v = currentVehicle && vById(currentVehicle);
+  modal(`
+    <h2>Nuovo intervento</h2>
+    <label>Veicolo</label>
+    <select id="f_vid">${vehicleOptions(currentVehicle)}</select>
+    <label>Lavori eseguiti</label>
+    <input id="f_desc" placeholder="es. Cambio olio 5W30 + filtro olio, aria e abitacolo">
+    <div class="grid2">
+      <div><label>Data</label><input id="f_data" type="date" value="${todayStr()}"></div>
+      <div><label>Prezzo (£)</label><input id="f_prezzo" type="number" step="0.01" placeholder="0.00"></div>
+    </div>
+    <label>Km</label>
+    <input id="f_ikm" type="number" placeholder="${v?fmtKm(v.Km):'es. 85000'}">
+    <label>Note</label>
+    <textarea id="f_inote" rows="2" placeholder="opzionale (officina, ricambi, part number...)"></textarea>
+    <div class="btnRow">
+      <button class="btn ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn primary" onclick="saveIntervento()">Salva</button>
+    </div>
+  `);
+}
+async function saveIntervento(){
+  const p = {
+    veicoloId: $('f_vid').value,
+    data: $('f_data').value,
+    tipo: '',
+    km: parseInt($('f_ikm').value,10)||'',
+    prezzo: parseFloat($('f_prezzo').value)||0,
+    descrizione: $('f_desc').value.trim(),
+    note: $('f_inote').value.trim()
+  };
+  if(!p.veicoloId || !p.data) return toast('Compila veicolo e data');
+  if(!p.descrizione) return toast('Scrivi cosa hai fatto');
+  closeModal();
+  await doAction('addIntervento', p, 'Intervento salvato ✓');
+}
+async function delIntervento(id){
+  if(!confirm('Eliminare questo intervento?')) return;
+  await doAction('deleteIntervento', {id}, 'Eliminato');
+}
+
+/* --- Scadenza --- */
+function openScadenzaForm(){
+  closeFab();
+  if(activeVehicles().length===0) return toast('Prima aggiungi un veicolo');
+  modal(`
+    <h2>Nuova scadenza</h2>
+    <label>Veicolo</label>
+    <select id="f_vid">${vehicleOptions(currentVehicle)}</select>
+    <label>Tipo</label>
+    <select id="f_tipo">${typeOptions(TIPI_SCADENZA)}</select>
+    <div class="grid2">
+      <div><label>Data attivazione</label><input id="f_d1" type="date" value="${todayStr()}" onchange="autoScad()"></div>
+      <div><label>Data scadenza</label><input id="f_d2" type="date" value="${plusOneYear(todayStr())}"></div>
+    </div>
+    <label>Prezzo (£)</label>
+    <input id="f_prezzo" type="number" step="0.01" placeholder="0.00">
+    <label>Note</label>
+    <textarea id="f_snote" rows="2" placeholder="opzionale (compagnia, polizza n°...)"></textarea>
+    <div class="btnRow">
+      <button class="btn ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn primary" onclick="saveScadenza()">Salva</button>
+    </div>
+  `);
+}
+function autoScad(){ const d1=$('f_d1').value; if(d1) $('f_d2').value = plusOneYear(d1); }
+async function saveScadenza(){
+  const p = {
+    veicoloId: $('f_vid').value,
+    tipo: $('f_tipo').value,
+    dataInizio: $('f_d1').value,
+    dataScadenza: $('f_d2').value,
+    prezzo: parseFloat($('f_prezzo').value)||0,
+    note: $('f_snote').value.trim()
+  };
+  if(!p.dataScadenza) return toast('Inserisci la data di scadenza');
+  closeModal();
+  await doAction('addScadenza', p, 'Scadenza salvata ✓');
+}
+async function delScadenza(id){
+  if(!confirm('Eliminare questa scadenza?')) return;
+  await doAction('deleteScadenza', {id}, 'Eliminata');
+}
+
+/* --- Rinnovo --- */
+function openRenewForm(oldId){
+  const old = DB.scadenze.find(s=>String(s.ID)===String(oldId));
+  if(!old) return;
+  const start = old.DataScadenza && daysTo(old.DataScadenza)>=0 ? old.DataScadenza : todayStr();
+  modal(`
+    <h2>Rinnova ${esc(old.Tipo)}</h2>
+    <p style="color:var(--muted);font-size:14px;margin-top:4px">La scadenza attuale verrà spostata nello storico.</p>
+    <div class="grid2">
+      <div><label>Nuova attivazione</label><input id="f_d1" type="date" value="${start}" onchange="autoScad()"></div>
+      <div><label>Nuova scadenza</label><input id="f_d2" type="date" value="${plusOneYear(start)}"></div>
+    </div>
+    <label>Prezzo (£)</label>
+    <input id="f_prezzo" type="number" step="0.01" placeholder="0.00" value="${old.Prezzo||''}">
+    <label>Note</label>
+    <textarea id="f_snote" rows="2">${esc(old.Note||'')}</textarea>
+    <div class="btnRow">
+      <button class="btn ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn primary" onclick="saveRenew('${oldId}','${esc(old.VeicoloID)}','${esc(old.Tipo)}')">Rinnova</button>
+    </div>
+  `);
+}
+async function saveRenew(oldId, vid, tipo){
+  const p = {
+    oldId: oldId, veicoloId: vid, tipo: tipo,
+    dataInizio: $('f_d1').value,
+    dataScadenza: $('f_d2').value,
+    prezzo: parseFloat($('f_prezzo').value)||0,
+    note: $('f_snote').value.trim()
+  };
+  if(!p.dataScadenza) return toast('Inserisci la data di scadenza');
+  closeModal();
+  await doAction('renewScadenza', p, tipo + ' rinnovata ✓');
+}
+
+/* ---------------- SETTINGS ---------------- */
+function openSettings(){
+  closeFab();
+  const archived = DB.veicoli.filter(v=>v.Stato==='archiviata');
+  const urlNow = localStorage.getItem('mcg_url') || (SCRIPT_URL.startsWith('http')?SCRIPT_URL:'');
+  modal(`
+    <h2>Impostazioni</h2>
+    <label>URL script backend (/exec)</label>
+    <input id="f_url" value="${esc(urlNow)}" placeholder="https://script.google.com/macros/s/.../exec">
+    <div class="btnRow">
+      <button class="btn primary" onclick="saveUrl()">Salva URL e ricarica</button>
+    </div>
+    <div class="secTitle" style="margin-top:26px">Veicoli archiviati</div>
+    ${archived.length===0 ? '<div class="emptyMsg" style="padding:10px">Nessun veicolo archiviato</div>'
+      : archived.map(v=>`<div class="item"><div class="r1"><b>${esc(vName(v))}</b>
+          <button class="amber" style="border:1px solid var(--amber);border-radius:8px;padding:6px 10px;font-size:13px" onclick="restoreVehicle('${v.ID}')">Ripristina</button></div>
+          <div class="r2"><span>${esc((v.Marca+' '+v.Modello).trim())} · spese totali ${fmtMoney(spesaTotale(v.ID))}</span></div>
+        </div>`).join('')}
+    <div class="secTitle" style="margin-top:26px">Info</div>
+    <div style="color:var(--muted);font-size:14px;line-height:1.7">
+      MyCarGarage v${APP_VERSION}<br>
+      Dati salvati su Google Drive (Sheet)<br>
+      Promemoria email: 30 / 14 / 7 / 0 giorni prima
+    </div>
+    <div class="btnRow"><button class="btn ghost" onclick="closeModal()">Chiudi</button></div>
+  `);
+}
+function saveUrl(){
+  const u = $('f_url').value.trim();
+  if(u && !u.startsWith('http')) return toast('URL non valido');
+  if(u) localStorage.setItem('mcg_url', u); else localStorage.removeItem('mcg_url');
+  closeModal();
+  loadData(true);
+}
+async function restoreVehicle(id){
+  closeModal();
+  await doAction('setVehicleState', {id, stato:'attiva'}, 'Veicolo ripristinato ✓');
+}
+
+/* ---------------- INIT ---------------- */
+buildKeypad();
+if(sessionStorage.getItem('mcg_auth')==='1') $('viewLock').classList.add('hidden');
+document.addEventListener('click', e=>{
+  if(!$('fabMenu').classList.contains('hidden') && !e.target.closest('#fab') && !e.target.closest('#fabMenu')) closeFab();
+});
+loadData(false);
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
