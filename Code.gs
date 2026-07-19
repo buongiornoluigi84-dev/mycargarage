@@ -1,7 +1,7 @@
 /**
  * ============================================================
  *  MyCarGarage - Backend Google Apps Script
- *  Versione: v1.0.0
+ *  Versione: v1.1.0
  * ============================================================
  *  ISTRUZIONI RAPIDE:
  *  1. Crea un nuovo Google Sheet su Drive, chiamalo "MyCarGarage DB"
@@ -64,7 +64,7 @@ function creaTriggerGiornaliero() {
 /* ---------------- API WEB ---------------- */
 
 function doGet(e) {
-  return jsonOut({ ok: true, app: 'MyCarGarage', version: '1.0.0' });
+  return jsonOut({ ok: true, app: 'MyCarGarage', version: '1.1.0' });
 }
 
 function doPost(e) {
@@ -82,6 +82,7 @@ function doPost(e) {
       case 'setVehicleState': result = setVehicleState(req.id, req.stato); break;
       case 'deleteVehicle':   result = deleteVehicle(req.id); break;
       case 'addIntervento':   result = addIntervento(req); break;
+      case 'setInterventoTipo': result = setInterventoTipo(req.id, req.tipo); break;
       case 'deleteIntervento':result = deleteRow(SHEET_INTERVENTI, req.id); break;
       case 'addScadenza':     result = addScadenza(req); break;
       case 'renewScadenza':   result = renewScadenza(req); break;
@@ -239,6 +240,13 @@ function addIntervento(r) {
   return { id: id };
 }
 
+function setInterventoTipo(id, tipo) {
+  const row = findRowById(SHEET_INTERVENTI, id);
+  if (row === -1) throw new Error('Intervento non trovato');
+  sheet(SHEET_INTERVENTI).getRange(row, 4).setValue(tipo); // colonna Tipo = categoria
+  return { id: id, tipo: tipo };
+}
+
 function addScadenza(r) {
   const id = newId();
   sheet(SHEET_SCADENZE).appendRow([
@@ -296,7 +304,7 @@ function controllaScadenze() {
       corpo += icona + ' ' + a.veicolo + ': ' + a.tipo + ' scade tra ' + a.giorni + ' giorni (' + dataIt + ')\n';
     }
   });
-  corpo += '\n— MyCarGarage v1.0.0';
+  corpo += '\n— MyCarGarage v1.1.0';
 
   const urgenti = daInviare.filter(a => a.giorni <= 7).length;
   const oggetto = (urgenti > 0 ? '🔴 ' : '') + 'MyCarGarage: ' + daInviare.length + ' scadenz' + (daInviare.length === 1 ? 'a' : 'e') + ' in arrivo';

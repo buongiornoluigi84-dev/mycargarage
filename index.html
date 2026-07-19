@@ -150,6 +150,19 @@ main{max-width:640px;margin:0 auto;padding:16px 16px 110px}
 .item .acts button{font-size:13px;color:var(--muted);padding:6px 10px;border:1px solid var(--line);border-radius:8px}
 .item .acts button.amber{color:var(--amber);border-color:var(--amber)}
 .item .acts button.red{color:var(--red)}
+.item .acts button.catOn{color:#111;background:var(--amber);border-color:var(--amber);font-weight:600}
+.catPick{display:flex;gap:8px}
+.catPick button{flex:1;padding:11px 6px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);font-size:14px;font-weight:600;color:var(--muted)}
+.catPick button.on{background:var(--amber);color:#111;border-color:var(--amber)}
+.catBox{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px 14px;margin-top:12px}
+.catRow{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:15px}
+.catRow:last-child{border-bottom:none}
+.catRow span{flex:1;color:var(--muted)}
+.catRow b{font-family:'Barlow Condensed';font-size:19px;font-weight:700}
+.catRow.tot span{color:var(--text);font-weight:600}
+.catRow.tot b{color:var(--amber);font-size:22px}
+.catRow.info{font-size:13px;color:var(--muted)}
+.catRow.info b{color:var(--green);font-size:17px}
 .badgeStato{font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--panel2);color:var(--muted)}
 
 /* ---------- MODALS ---------- */
@@ -226,11 +239,14 @@ main{max-width:640px;margin:0 auto;padding:16px 16px 110px}
    ============================================================ */
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2aplWOhRHY3omvKpqZUKtRfVPIKFoiMq8OMTVY3XGju5sqeoo4lX_8WG63KunPHI-_w/exec';
 
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.1.0';
 const PIN = '5918';
 const COLORS = ['#FFB020','#3D8BFF','#F2555A','#3DD68C','#B47CFF','#FF7A45','#4DD0E1','#9AA0AC'];
 const TIPI_INTERVENTO = ['Cambio olio','Filtri','Freni','Gomme','Batteria','Cinghia/Distribuzione','Pezzo sostituito','Riparazione','Carrozzeria','Lavaggio/Detailing','Altro'];
 const TIPI_SCADENZA = ['Assicurazione','Road Tax','MOT','Service/Tagliando','Altro'];
+const CATEGORIE = ['Gestione','Manutenzione','Extra'];
+const CAT_ICONE = {'Gestione':'\u{1F5C2}','Manutenzione':'\u{1F527}','Extra':'\u2795'};
+function catOf(i){ return CATEGORIE.includes(i.Tipo) ? i.Tipo : 'senza'; }
 
 let DB = {veicoli:[], interventi:[], scadenze:[]};
 let currentVehicle = null;
@@ -374,7 +390,7 @@ function renderDash(){
     return;
   }
   list.innerHTML = vs.map(v=>{
-    const spentYear = spesaAnno(v.ID, year);
+    const spentYear = spesaCatAnno(v.ID, year);
     const vDue = activeScadenze().filter(s=>String(s.VeicoloID)===String(v.ID))
       .map(s=>({s,days:daysTo(s.DataScadenza)})).sort((a,b)=>(a.days??9999)-(b.days??9999)).slice(0,3);
     const mini = vDue.map(({s,days})=>{
@@ -388,8 +404,9 @@ function renderDash(){
       </div>
       <div class="stats">
         <div><b>${fmtKm(v.Km)}</b> km</div>
-        <div><b>${fmtMoney(spentYear)}</b> spesi nel ${year}</div>
+        <div><b>${fmtMoney(spentYear.tot)}</b> spesi nel ${year}</div>
       </div>
+      ${spentYear.tot>0?`<div style="margin-top:6px;font-size:13px;color:var(--muted)">\u{1F5C2} ${fmtMoney(spentYear.Gestione)} \u00b7 \u{1F527} ${fmtMoney(spentYear.Manutenzione)} \u00b7 \u2795 ${fmtMoney(spentYear.Extra)}${spentYear.senza?` \u00b7 ? ${fmtMoney(spentYear.senza)}`:''}</div>`:''}
       ${mini?`<div class="mini">${mini}</div>`:''}
     </div>`;
   }).join('');
@@ -400,6 +417,34 @@ function spesaAnno(vid, year){
   let tot = 0;
   DB.interventi.forEach(i=>{ if(String(i.VeicoloID)===String(vid) && String(i.Data).startsWith(year)) tot += Number(i.Prezzo)||0; });
   return tot;
+}
+function spesaCatAnno(vid, year){
+  const r = {'Gestione':0,'Manutenzione':0,'Extra':0,'senza':0,tot:0};
+  DB.interventi.forEach(i=>{
+    if(String(i.VeicoloID)===String(vid) && String(i.Data).startsWith(year)){
+      const p = Number(i.Prezzo)||0;
+      r[catOf(i)] += p; r.tot += p;
+    }
+  });
+  return r;
+}
+function gestioneMaturata(vid){
+  // Quota "consumata" ad oggi dei costi periodici (da prezzi indicativi delle scadenze attive)
+  let maturato = 0, alGiorno = 0;
+  const oggi = new Date(); oggi.setHours(0,0,0,0);
+  DB.scadenze.forEach(s=>{
+    if(String(s.VeicoloID)!==String(vid) || s.Stato!=='attiva') return;
+    const p = Number(s.Prezzo)||0;
+    if(!p || !s.DataInizio || !s.DataScadenza) return;
+    const d1 = new Date(s.DataInizio+'T00:00:00'), d2 = new Date(s.DataScadenza+'T00:00:00');
+    const dur = (d2-d1)/86400000;
+    if(dur<=0) return;
+    let el = (oggi-d1)/86400000;
+    el = Math.max(0, Math.min(el, dur));
+    maturato += p*el/dur;
+    if(el<dur) alGiorno += p/dur;
+  });
+  return {maturato, alGiorno};
 }
 function spesaTotale(vid){
   let tot = 0;
@@ -430,6 +475,8 @@ function renderVehicle(id){
   const v = vById(id);
   if(!v){ showDash(); return; }
   const year = new Date().getFullYear();
+  const cat = spesaCatAnno(id, year);
+  const mat = gestioneMaturata(id);
   const ints = DB.interventi.filter(i=>String(i.VeicoloID)===String(id))
     .sort((a,b)=>String(b.Data).localeCompare(String(a.Data)));
   const scads = DB.scadenze.filter(s=>String(s.VeicoloID)===String(id))
@@ -445,9 +492,11 @@ function renderVehicle(id){
       : ints.map(i=>`<div class="item">
           <div class="r1"><b>${esc(i.Descrizione||i.Tipo)}</b><span class="price">${fmtMoney(i.Prezzo)}</span></div>
           <div class="r2"><span>📅 ${fmtDateIt(i.Data)}</span>${i.Km?`<span>🛣 ${fmtKm(i.Km)} km</span>`:''}</div>
-          ${i.Descrizione&&i.Tipo?`<div class="desc">${esc(i.Tipo)}</div>`:''}
           ${i.Note?`<div class="desc" style="color:var(--muted)">${esc(i.Note)}</div>`:''}
-          <div class="acts"><button class="red" onclick="delIntervento('${i.ID}')">Elimina</button></div>
+          <div class="acts">
+            ${CATEGORIE.map(c=>`<button class="${i.Tipo===c?'catOn':''}" onclick="setCategoria('${i.ID}','${c}')">${CAT_ICONE[c]} ${c}</button>`).join('')}
+            <button class="red" onclick="delIntervento('${i.ID}')">Elimina</button>
+          </div>
         </div>`).join('');
   } else {
     body = scads.length===0
@@ -494,8 +543,16 @@ function renderVehicle(id){
       ${v.Note?`<div class="desc" style="margin-top:10px;color:var(--muted);font-size:14px">${esc(v.Note)}</div>`:''}
     </div>
     <div class="totRow">
-      <div class="totBox"><small>Spese ${year}</small><b>${fmtMoney(spesaAnno(v.ID, year))}</b></div>
+      <div class="totBox"><small>Spese ${year}</small><b>${fmtMoney(cat.tot)}</b></div>
       <div class="totBox"><small>Spese totali</small><b>${fmtMoney(spesaTotale(v.ID))}</b></div>
+    </div>
+    <div class="catBox">
+      <div class="catRow"><span>\u{1F5C2} Gestione (assicurazione, tax, MOT)</span><b>${fmtMoney(cat.Gestione)}</b></div>
+      <div class="catRow"><span>\u{1F527} Manutenzione</span><b>${fmtMoney(cat.Manutenzione)}</b></div>
+      <div class="catRow"><span>\u2795 Extra</span><b>${fmtMoney(cat.Extra)}</b></div>
+      ${cat.senza?`<div class="catRow"><span>Senza categoria \u2014 tocca i bottoni sull'intervento per assegnarla</span><b>${fmtMoney(cat.senza)}</b></div>`:''}
+      <div class="catRow tot"><span>Totale ${year}</span><b>${fmtMoney(cat.tot)}</b></div>
+      ${mat.maturato>0?`<div class="catRow info"><span>Quota gestione maturata ad oggi (da scadenze attive)</span><b>${fmtMoney(mat.maturato)}${mat.alGiorno?' \u00b7 ~'+fmtMoney(mat.alGiorno)+'/gg':''}</b></div>`:''}
     </div>
     <div class="tabs">
       <button class="${currentTab==='interventi'?'on':''}" onclick="setTab('interventi')">🔧 Interventi (${ints.length})</button>
@@ -606,6 +663,8 @@ function openInterventoForm(){
     <select id="f_vid">${vehicleOptions(currentVehicle)}</select>
     <label>Lavori eseguiti</label>
     <input id="f_desc" placeholder="es. Cambio olio 5W30 + filtro olio, aria e abitacolo">
+    <label>Categoria</label>
+    <div class="catPick" id="catPick">${CATEGORIE.map((c,ix)=>`<button class="${ix===1?'on':''}" data-c="${c}" onclick="pickCat(this)">${CAT_ICONE[c]} ${c}</button>`).join('')}</div>
     <div class="grid2">
       <div><label>Data</label><input id="f_data" type="date" value="${todayStr()}"></div>
       <div><label>Prezzo (£)</label><input id="f_prezzo" type="number" step="0.01" placeholder="0.00"></div>
@@ -624,7 +683,7 @@ async function saveIntervento(){
   const p = {
     veicoloId: $('f_vid').value,
     data: $('f_data').value,
-    tipo: '',
+    tipo: document.querySelector('#catPick button.on')?.dataset.c || 'Extra',
     km: parseInt($('f_ikm').value,10)||'',
     prezzo: parseFloat($('f_prezzo').value)||0,
     descrizione: $('f_desc').value.trim(),
@@ -634,6 +693,10 @@ async function saveIntervento(){
   if(!p.descrizione) return toast('Scrivi cosa hai fatto');
   closeModal();
   await doAction('addIntervento', p, 'Intervento salvato ✓');
+}
+function pickCat(el){ document.querySelectorAll('#catPick button').forEach(b=>b.classList.remove('on')); el.classList.add('on'); }
+async function setCategoria(id, cat){
+  await doAction('setInterventoTipo', {id, tipo:cat}, 'Categoria: ' + cat + ' \u2713');
 }
 async function delIntervento(id){
   if(!confirm('Eliminare questo intervento?')) return;

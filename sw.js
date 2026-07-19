@@ -1,5 +1,5 @@
-/* MyCarGarage Service Worker - mycargarage-v5 */
-const CACHE = 'mycargarage-v5';
+/* MyCarGarage Service Worker - mycargarage-v6 */
+const CACHE = 'mycargarage-v6';
 const ASSETS = [
   './',
   './index.html',
